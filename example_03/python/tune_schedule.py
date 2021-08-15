@@ -19,7 +19,7 @@ target_type = sys.argv[1]
 
 # Also replace this with the device key in your tracker
 device_key = "v9h" # rename as your device chip type 
-rpc_host = "192.168.0.109" # replace your pc host ip
+rpc_host = "192.168.105.70" # replace your pc host ip
 rpc_port = 9190 # replace the tracker server port
 print("target device:", device_key)
 print("rpc_host: %s:%s" % (rpc_host, rpc_port))
