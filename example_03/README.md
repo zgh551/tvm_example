@@ -97,7 +97,7 @@ v9h    1      1     0
 ----------------------------
 ```
 
-it show two device `v9h` and `rasp` connect to the tracker server.
+It show two device `v9h` and `rasp` connect to the tracker server.
 
 ### 2.2. Revise Host `IP`
 

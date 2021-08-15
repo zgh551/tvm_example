@@ -49,7 +49,7 @@ models/
 ```
 The `data` folder contain some test data. The `aarch64_run.tar.gz` and `opencl_run.tar.gz` file can copy to the target device to running. In the PC host, you can enter into `x86_64` folder to run `./mnist_test`.
 
->> note: make sure the configure of python environment which contain tvm and AI fronted frame is ok.
+> Note: make sure the configure of python environment which contain tvm and AI fronted frame is ok.
 
 ## 2. Device Run
 
@@ -59,19 +59,19 @@ The `data` folder contain some test data. The `aarch64_run.tar.gz` and `opencl_r
 2. libopencv_imgcodecs.so
 3. libopencv_imgproc.so
 
-in the `depend` folder include the `opencv_deploy.run` file, if target device don't contain this dynamic library, you should copy this file to target device and execute command as follow:
+In the `depend` folder include the `opencv_deploy.run` file, if target device don't contain this dynamic library, you should copy this file to target device and execute command as follow:
 
 ```bash
 $ chmod 775 opencv_deploy.run
 $ ./opencv_deploy.run
 ```
 
-this will auto deploy the dynamic library to the `/usr/sdrv/opencv` folder.
+This will auto deploy the dynamic library to the `/usr/sdrv/opencv` folder.
 
 - **TVM**
 1. libtvm-runtime.so
 
-In the `tvm` folder, run `./build.sh deploy` will generate the `tvm_runtime_deploy.run` file in `build_aarch64`folder,  if target device don't contain this dynamic library, you should copy this file to target device and execute command as follow:
+In the `tvm` folder, execute `./build.sh deploy` will generate the `tvm_runtime_deploy.run` file in `build_aarch64`folder,  if target device don't contain this dynamic library, you should copy this file to target device and execute command as follow:
 
 ```shell
 $ chmod 775 tvm_runtime_deploy.run
