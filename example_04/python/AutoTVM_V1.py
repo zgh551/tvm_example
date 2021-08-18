@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
-
 
 import onnx
 import glob
@@ -18,11 +16,8 @@ from tvm.autotvm.tuner import XGBTuner, GATuner, RandomTuner, GridSearchTuner
 import tvm.contrib.graph_executor as runtime
 
 
-# In[2]:
-
-
 # Also replace this with the device key in your tracker
-device_key = "rasp"
+device_key = "v9h"
 if device_key == "v9h":
     rpc_host = "192.168.105.70"
 elif device_key == "rasp":
@@ -30,9 +25,6 @@ elif device_key == "rasp":
 rpc_port = 9190
 print("device:", device_key)
 print("rpc_host: %s:%s" % (rpc_host, rpc_port))
-
-
-# In[3]:
 
 
 # Define the neural network and compilation target.
@@ -47,9 +39,6 @@ dtype = "float32"
 device_type = "opencl"
 
 
-# In[4]:
-
-
 turn_trials = 200
 turn_enable = True
 preload_log_file = False
@@ -57,9 +46,6 @@ preload_log_file = False
 use_ndk = False
 # Path to cross compiler
 # os.environ["TVM_NDK_CC"] = "/usr/bin/aarch64-linux-gnu-g++"
-
-
-# In[5]:
 
 
 if network == "mobilenet":
@@ -76,13 +62,7 @@ elif network == "mnist":
     print("shape_dict: ", shape_dict)
 
 
-# In[6]:
-
-
 model, params = relay.frontend.from_onnx(tune_model, shape_dict)
-
-
-# In[7]:
 
 
 if device_type == "armv7":
@@ -97,9 +77,6 @@ log_file = "%s-%s-%s-B%d-%s-C%s-T%s.log" % (device_key, network, layout, batch_s
 print("log file:", log_file)
 
 
-# In[8]:
-
-
 if layout == 'NHWC':
     # convert from NCHW to NHWC
     desired_layouts = {'nn.conv2d': ['NHWC', 'default']}
@@ -112,8 +89,6 @@ if layout == 'NHWC':
     with tvm.transform.PassContext(opt_level=3):
         model = seq(model)
 
-
-# In[9]:
 
 
 # tuning_option = {
@@ -152,9 +127,6 @@ measure_option = autotvm.measure_option(
                 )
 
 
-# In[10]:
-
-
 # extract workloads from relay program
 print("Extract tasks...")
 tasks = autotvm.task.extract_from_program(
@@ -166,16 +138,10 @@ for idx, task in enumerate(tasks):
     print(task.args)
 
 
-# In[11]:
-
-
 # create tmp log file
 tmp_log_file = log_filename + ".tmp"
 if os.path.exists(tmp_log_file):
     os.remove(tmp_log_file)
-
-
-# In[12]:
 
 
 # run tuning tasks
@@ -217,15 +183,9 @@ for i, tsk in enumerate(reversed(tasks)):
     )
 
 
-# In[ ]:
-
-
 # pick best records to a cache file
 autotvm.record.pick_best(tmp_log_file, log_filename)
 os.remove(tmp_log_file)
-
-
-# In[ ]:
 
 
 # compile kernels with history best records
@@ -235,18 +195,12 @@ with autotvm.apply_history_best(log_file):
         lib = relay.build_module.build(model, target=target, params=params)
 
 
-# In[ ]:
-
-
 #  export library
 temp = utils.tempdir()
 filename = device_type + "_deploy_lib.tar"
 path_lib = temp.relpath(filename)
 lib.export_library(path_lib)
 # lib.export_library(path_lib, ndk.create_shared)
-
-
-# In[ ]:
 
 
 print("=============== Request Remote ===============")
@@ -262,32 +216,14 @@ elif device_type == "opencl":
     dev = remote.cl()
 
 
-# In[ ]:
-
-
 # Create graph executor
 module = runtime.GraphModule(loaded_lib["default"](dev))
 # module = graph_executor.GraphModule(loaded_lib["default"](dev))
 module.set_input(input_name, tvm.nd.array((np.random.uniform(size=input_shape)).astype(dtype)))
 
-
-# In[ ]:
-
-
 # Evaluate
 print("Evaluate inference time cost...")
 ftimer = module.module.time_evaluator("run", dev, repeat=3, min_repeat_ms=50)
-
-
-# In[ ]:
-
-
 prof_res = np.array(ftimer().results) * 1e3  # convert to millisecond
 print("Mean inference time (std dev): %.2f ms (%.2f ms)" % (np.mean(prof_res), np.std(prof_res)))
-
-
-# In[ ]:
-
-
-
 
