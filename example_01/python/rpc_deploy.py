@@ -143,13 +143,14 @@ if target_type == 'x86_64':
 elif target_type == 'aarch64':
     remote = rpc.connect(host, port)
     dev = remote.cpu(0)
+    # configure the number of cpu running cores
+    config_func = remote.get_function('runtime.config_threadpool')
+    config_func(core_type, core_num)
 elif target_type == 'opencl':
     remote = rpc.connect(host, port)
     dev = remote.cl(0)
-
 print("Target type:", target_type)
-config_func = remote.get_function('runtime.config_threadpool')
-config_func(core_type, core_num)
+
 # upload the library to remote device and load it
 remote.upload(lib_fname)
 rlib = remote.load_module("net.tar")
@@ -173,33 +174,20 @@ if network_name == "mobilenet":
     # get output
     tvm_output = module.get_output(0).numpy()
     top1 = np.argmax(tvm_output[0])
-    print("top1:", top1)
-
-    #label_path = download_testdata(label_file_url, label_file, module="data")
-
-    # List of 1001 classes
-    #with open(label_path) as f:
-    #    labels = f.readlines()
-
-    # Convert result to 1D data
-    #predictions = np.squeeze(tvm_output)
-
-    # Get top 1 prediction
-    #prediction = np.argmax(predictions)
-
-    # Convert id to class name and show the result
-    #print("The image prediction result is: id " + str(prediction) + " name: " + labels[prediction])
-else:
+    print("mobile top1:", top1)
+elif network_name == "mnist": 
     # set input data
     module.set_input(input_name, tvm.nd.array((np.random.uniform(size=input_shape)).astype(input_dtype))) 
-# get the result
-#number = np.argmax(out.numpy())
-#print("TVM prediction number: ", number)
+    # run
+    module.run()
+    # get the result
+    number = np.argmax(out.numpy())
+    print("mnist prediction number: ", number)
 
 module.set_input(input_name, tvm.nd.array((np.random.uniform(size=input_shape)).astype(input_dtype))) 
 # evaluate
 print("Evaluate inference time cost...")
 ftimer = module.module.time_evaluator("run", dev, number=50, repeat=3)
-prof_res = np.array(ftimer().results) * 1000
 # convert to millisecond
+prof_res = np.array(ftimer().results) * 1000
 print("Mean inference time (std dev): %.2f ms (%.2f ms)" % (np.mean(prof_res), np.std(prof_res)))
