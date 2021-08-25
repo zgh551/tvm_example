@@ -1,4 +1,4 @@
-# Example Tree
+# Example Four
 This example introduce one way to use `tvm rpc tracker server` to tune and evaluate the performance of  the **mnist** model  on `x86_64` , `arm` or `gpu` device.
 
 > Note: rpc tracker server current only supports ubuntu but not yocto os.
