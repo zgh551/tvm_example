@@ -1,5 +1,5 @@
 # Example One
-This example introduce one way to use `tvm rpc server` to deploy the **mnist** model  on `x86_64` , `arm`or `gpu` device.
+This example introduce one way to use `tvm rpc server` to deploy the model  on `x86_64` , `arm`or `gpu` device.
 
 > Note: rpc server current only supports ubuntu but not yocto os.
 
@@ -60,7 +60,11 @@ INFO:RPCServer:bind to 0.0.0.0:9090
 
 Open the `{example_base_dir}/python/rpc_deploy.py` file and replace  `host="192.168.104.240"` to your device actual `ip` address.
 
-### 2.2. Running Script
+### 2.2. CPU Running Cores
+
+Open `{example_base_dir}/python/rpc_deploy.py` file, you can set the `core_num` variable to configure the number of `cpu` cores for target device. In the target device, you can also set add the environment variable `export TVM_NUM_THREADS=6` to set the number of `cpu` cores.
+
+### 2.3. Running Script
 
 1. running `build.sh` script for model build.
 
@@ -81,6 +85,19 @@ Enter target type number: 1
 ```
 If the enter number is `1` ,the script will deploy model on `x86_64` device.
 
+3. select the tune model
+
+```
+---| number | models         |
+-->   [1]   | mnist          |
+-->   [2]   | mobilenet      |
+-->   [3]   | op9_dla_onnx   |
+-->   [4]   | op9_dla_tflite |
+Enter model number: 1
+```
+
+if select the number of one, it will tune the `mnist` model.
+
 ### 2.3 Result
 
 ```shell
@@ -89,8 +106,13 @@ If the enter number is `1` ,the script will deploy model on `x86_64` device.
 -->   [2]   |   aarch64  |     
 -->   [3]   |   opencl   |         
 -->   [4]   |   all      |
-Enter target type number: 1                                                                                                      
-x86_64 build      
+Enter target type number: 1                                                            ---| number | models         |
+-->   [1]   | mnist          |
+-->   [2]   | mobilenet      |
+-->   [3]   | op9_dla_onnx   |
+-->   [4]   | op9_dla_tflite |
+Enter model number: 1
+x86_64 build for mnist    
 device: llvm -keys=cpu -link-params=0
 host: llvm -keys=cpu -link-params=0
 One or more operators have not been tuned. Please tune your model for better performance. Use DEBUG logging level to see more details.

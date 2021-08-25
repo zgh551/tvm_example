@@ -1,5 +1,5 @@
 # Example Four
-This example introduce one way to use `tvm rpc tracker server` to tune and evaluate the performance of  the **mnist** model  on `x86_64` , `arm` or `gpu` device.
+This example introduce one way to use `AutoTVM` to tune the `conv` operator and evaluate the performance of  the model  on `x86_64` , `arm` or `gpu` device.
 
 > Note: rpc tracker server current only supports ubuntu but not yocto os.
 
@@ -101,9 +101,17 @@ It show two device `v9h` and `rasp` connect to the tracker server.
 
 ### 2.2. Revise Host `IP`
 
-Open the `{example_base_dir}/python/tune_schedule.py` file and replace  `rpc_host="192.168.105.70"` to pc host actual `ip` address. `rpc_port=9190` set as the host tracker server port and the `device_key=v9h` set as the device name.
+Open `{example_base_dir}/python/AutoTVM.py` file and replace  `rpc_host="192.168.1.18"` to the actual `ip` address of  host . `rpc_port=9190` set as the host tracker server port and the `device_key=v9h` set as the device name.
 
-### 2.3. Running Script
+### 2.3. Enable Tune
+
+Open `{example_base_dir}/python/AutoTVM.py` file, if first execute the tune task, then set the `tune_enable` to be `True`.if `auto_tvm_log` folder have the log file of model, then you can set the `tune_enable` to be `Flase`.
+
+### 2.4. CPU Running Cores
+
+Open `{example_base_dir}/python/AutoTVM.py` file, you can set the `core_num` variable to configure the number of `cpu` cores for target device. In the target device, you can also set add the environment variable `export TVM_NUM_THREADS=6` to set the number of `cpu` cores.
+
+### 2.5. Running Script
 
 1. running `build.sh` script for tune model and evaluate the model performance.
 
@@ -124,43 +132,69 @@ Enter target type number: 1
 ```
 If the enter number is `1` ,the script will tune model on `x86_64` device.
 
+3. select the tune model
+
+```
+---| number | models         |
+-->   [1]   | mnist          |
+-->   [2]   | mobilenet      |
+-->   [3]   | op9_dla_onnx   |
+-->   [4]   | op9_dla_tflite |
+Enter model number: 1
+```
+
+if select the number of one, it will tune the `mnist` model.
+
 ### 2.3 Result
 
 ```shell
----| number | target type|                                               
--->   [1]   |   x86_64   |                                               
--->   [2]   |   aarch64  |                                               
--->   [3]   |   opencl   | 
+---| number | target type|                                                                                                   
+-->   [1]   |   x86_64   |
+-->   [2]   |   aarch64  |
+-->   [3]   |   opencl   |
 -->   [4]   |   all      |
 Enter target type number: 1
-x86_64 build
-target device: v9h
-rpc_host: 192.168.0.109:9190
-shape_dict:  {'Input3': (1, 1, 28, 28)}
-device: llvm -keys=cpu -link-params=0
-log file: mnist-NCHW-B1-llvm-C200-T21-08-14-21-44.json
-Begin tuning...
-Get devices for measurement successfully!
-----------------------------------------------------------------------
-------------------------------  [ Task Scheduler ]
-----------------------------------------------------------------------
-|  ID  | Latency (ms) | Speed (GFLOPS) | Trials |
--------------------------------------------------
-|    0 |            - |              - |      0 |
-|    1 |            - |              - |      0 |
-|    2 |            - |              - |      0 |
-|    3 |            - |              - |      0 |
-|    4 |            - |              - |      0 |
--------------------------------------------------
-Estimated total latency: - ms   Trials: 0       Used time : 0 s Next ID: 0
-----------------------------------------------------------------------
-------------------------------  [ Search ]
-----------------------------------------------------------------------
-Generate Sketches               #s: 5
-Sample Initial Population       #s: 789 fail_ct: 835    Time elapsed: 3.27
-GA Iter: 0      Max score: 0.9993       Min score: 0.8937       #Pop: 80        #M+: 0  #M-: 0
-GA Iter: 4      Max score: 0.9999       Min score: 0.9897       #Pop: 80        #M+: 1380       #M-: 77
-EvolutionarySearch              #s: 80  Time elapsed: 13.79
-----------------------------------------------------------------------
+---| number | models         |
+-->   [1]   | mnist          |
+-->   [2]   | mobilenet      |
+-->   [3]   | op9_dla_onnx   |
+-->   [4]   | op9_dla_tflite |
+Enter model number: 1
+x86_64 build for mnist
+device: v9h
+rpc_host: 192.168.1.18:9190
+temp log file: name: v9h-mnist-NCHW-x86_64-C1000-T21-08-25-07-54.log
+log file: name: v9h-mnist-NCHW-x86_64.log
+Extract tasks...
+========== Task 0 (function name: conv2d_NCHWc.x86) [0.313600 GFLOPS] ==========
+(('TENSOR', (1, 1, 32, 32), 'float32'), ('TENSOR', (8, 1, 5, 5), 'float32'), (1, 1), (0, 0, 0, 0), (1, 1), 'NCHW', 'NCHW', 'float32')
+========== Task 1 (function name: conv2d_NCHWc.x86) [1.254400 GFLOPS] ==========
+(('TENSOR', (1, 8, 18, 18), 'float32'), ('TENSOR', (16, 8, 5, 5), 'float32'), (1, 1), (0, 0, 0, 0), (1, 1), 'NCHW', 'NCHW', 'float32')
+========== Task 2 (function name: dense_nopack.x86) [0.005130 GFLOPS] ==========
+(('TENSOR', (1, 256), 'float32'), ('TENSOR', (10, 256), 'float32'), None, 'float32')
+========== Task 3 (function name: dense_pack.x86) [0.005120 GFLOPS] ==========
+(('TENSOR', (1, 256), 'float32'), ('TENSOR', (10, 256), 'float32'), None, 'float32')
+Tuning...
+[Task  1/ 4]  Current/Best:    2.20/   4.17 GFLOPS | Progress: (48/81) | 11.08 s/usr/local/lib/python3.6/dist-packages/xgboost/training.py:17: UserWarning:
+ Old style callback is deprecated.  See: https://xgboost.readthedocs.io/en/latest/python/callbacks.html
+  warnings.warn(f'Old style callback is deprecated.  See: {link}', UserWarning)
+[Task  1/ 4]  Current/Best:    3.05/   4.56 GFLOPS | Progress: (81/81) | 18.05 s Done.
+[Task  2/ 4]  Current/Best:    1.62/   4.74 GFLOPS | Progress: (36/36) | 8.12 s Done.
+[Task  3/ 4]  Current/Best:   41.00/ 151.52 GFLOPS | Progress: (240/240) | 45.72 s Done.
+[Task  4/ 4]  Current/Best:   18.20/ 103.45 GFLOPS | Progress: (64/64) | 12.52 s Done.
+2021-08-25 07:56:15,009 INFO Start to benchmark layout transformation...
+2021-08-25 07:56:23,401 INFO Benchmarking layout transformation successful.
+2021-08-25 07:56:23,401 INFO Start to run dynamic programming algorithm...
+2021-08-25 07:56:23,401 INFO Start forward pass...
+2021-08-25 07:56:23,401 INFO Finished forward pass.
+2021-08-25 07:56:23,401 INFO Start backward pass...
+2021-08-25 07:56:23,402 INFO Finished backward pass...
+2021-08-25 07:56:23,402 INFO Finished DPExecutor run.
+2021-08-25 07:56:23,402 INFO Writing optimal schedules to auto_tvm_log/v9h-mnist-NCHW-x86_64.log successfully.
+Compile...
+<tvm.relay.backend.executor_factory.GraphExecutorFactoryModule object at 0x7f609cd7e438>
+Module(llvm, 3a73508)
+Evaluate inference time cost...
+Mean inference time (std dev): 0.02 ms (0.00 ms)
 ```
 
