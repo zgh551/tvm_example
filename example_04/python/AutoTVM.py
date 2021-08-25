@@ -16,89 +16,85 @@ import tvm.contrib.graph_executor as runtime
 import logging
 import sys
 
-#logging.getLogger('autotvm').setLevel(logging.DEBUG)
-logging.getLogger("autotvm").addHandler(logging.StreamHandler(sys.stdout))
-
-# Also replace this with the device key in your tracker
-device_key = "v9h"
-
-# Define the neural network and compilation target.
-#network = "mobilenet"
-#network = "mobilenet_tflite"
-#network = "mnist"
-#network = "op9_dla"
-network = "op9_dla_tflite"
-
-# define the cevice type
-#device_type = "x86_64"
-#device_type = "armv7"
-device_type = "aarch64"
-#device_type = "opencl"
-core_type = -1
-core_num  = 2
-
-batch_size = 1
-#layout = "NHWC"
-layout = "NCHW"
-
-tuner = "xgb"
-turn_trials = 64#1000
-early_stopping = 32#800
-
+# configure whether enable tune
 turn_enable = False  
 use_transfer_learning = True 
-preload_log_file = False
+# configure the tune parameters
+turn_trials = 1000
+early_stopping = 800
+tuner = "xgb"
 # Set this to True if you use ndk tools for cross compiling
 use_ndk = False
-# Path to cross compiler
-# os.environ["TVM_NDK_CC"] = "/usr/bin/aarch64-linux-gnu-g++"
-
-
-if network == "mobilenet":
-    tune_model = onnx.load('../mobilenet/mobilenetv2-7.onnx')
+# Also replace this with the device key in your tracker
+device_key = "v9h"
+# repalce the host ip of your pc 
+rpc_host = "192.168.1.18"
+rpc_port = 9190
+print("device:", device_key)
+print("rpc_host: %s:%s" % (rpc_host, rpc_port))
+# configure the number of running core
+core_type = -1
+core_num  = 2
+# get the target device type 
+target_type  = sys.argv[1]
+network_name = sys.argv[2]
+# configure the layout parameters
+batch_size = 1
+layout = "NCHW"
+pretrained_model_path = "../pretrained_models"
+# load the nn model
+if network_name == "mnist":
+    model_path = os.path.join(pretrained_model_path, "mnist/mnist-8.onnx")
+    onnx_model = onnx.load(model_path)
+    # configure the model input ,shape ans type
+    input_name  = "Input3"
+    input_shape = (1, 1, 28, 28);
+    input_dtype = "float32"
+    shape_dict = {input_name: input_shape}
+    dtype_dict = {input_name: input_dtype}
+    # convert the model to ir module
+    model, params = relay.frontend.from_onnx(onnx_model, shape_dict, dtype_dict)
+elif network_name == "mobilenet":
+    model_path = os.path.join(pretrained_model_path, "mobilenet/onnx/mobilenetv2-7.onnx")
+    onnx_model = onnx.load(model_path)
+    # configure the model input ,shape ans type
     input_name = "input"
-    input_shape = (batch_size, 3, 244, 244)
-    shape_dict = {input_name: input_shape}
+    input_shape = (1, 3, 224, 224);
     input_dtype = "float32"
-    dtype_dict = {input_name: input_dtype}
-    print("shape_dict: ", shape_dict)
-    model, params = relay.frontend.from_onnx(tune_model, shape_dict, dtype_dict)
-elif network == "mnist":
-    tune_model = onnx.load('../mnist/mnist-8.onnx')
-    input_name = "Input3"
-    input_shape = (batch_size, 1, 28, 28)
     shape_dict = {input_name: input_shape}
-    input_dtype = "float32"
     dtype_dict = {input_name: input_dtype}
-    print("shape_dict: ", shape_dict)
-    model, params = relay.frontend.from_onnx(tune_model, shape_dict, dtype_dict)
-elif network == "op9_dla":
-    onnx_model = onnx.load('../op9_dla/op9_dla.onnx')
+    # convert the model to ir module
+    model, params = relay.frontend.from_onnx(onnx_model, shape_dict, dtype_dict)
+elif network_name == "op9_dla_onnx":
+    model_path = os.path.join(pretrained_model_path, "op9_dla/onnx/op9_dla.onnx")
+    onnx_model = onnx.load(model_path)
+    # configure the model input ,shape ans type
     input_name = "input.1"
     input_shape = (1, 320, 40, 24);
     input_dtype = "float32"
     shape_dict = {input_name: input_shape}
     dtype_dict = {input_name: input_dtype}
-    # convert the model to ir
+    # convert the model to ir module
     model, params = relay.frontend.from_onnx(onnx_model, shape_dict, dtype_dict)
-    # Configure the quantization behavior
-    qconfig = relay.quantize.qconfig(skip_conv_layers=[0],
-                    nbit_input=8,
-                    nbit_weight=8,
-                    global_scale=8.0,
-                    dtype_input='int8',
-                    dtype_weight='int8',
-                    dtype_activation='int8',
-                    debug_enabled_ops=None)
-    with qconfig:
-        model = relay.quantize.quantize(model, params)
-    print(model)
-elif network == "op9_dla_tflite":
+
+    if quantify_enable:
+        # Configure the quantization behavior
+        qconfig = relay.quantize.qconfig(skip_conv_layers=[0],
+                        nbit_input=8,
+                        nbit_weight=8,
+                        global_scale=8.0,
+                        dtype_input='int8',
+                        dtype_weight='int8',
+                        dtype_activation='int8',
+                        debug_enabled_ops=None)
+        with qconfig:
+            quan_model = relay.quantize.quantize(model, params)
+elif network_name == "op9_dla_tflite":
     # Now we can open mobilenet_v1_1.0_224.tflite
-    model_dir = "../op9_dla"
-    #tflite_model_file = os.path.join(model_dir, "op9_dla_fp32.tflite")
-    tflite_model_file = os.path.join(model_dir, "op9_dla_int8.tflite")
-    tflite_model_buf = open(tflite_model_file, "rb").read()
+    model_dir = "op9_dla"
+    model_path = os.path.join(pretrained_model_path, "op9_dla/tflite/op9_dla_int8.tflite")
+    #model_path = os.path.join(pretrained_model_path, "op9_dla/tflite/op9_dla_fp32.tflite")
+    tflite_model_buf = open(model_path, "rb").read()
 
     # Get TFLite model from buffer
     try:
@@ -107,81 +103,48 @@ elif network == "op9_dla_tflite":
     except AttributeError:
         import tflite.Model
         tflite_model = tflite.Model.Model.GetRootAsModel(tflite_model_buf, 0)
+    # configure the model input ,shape ans type
     input_name = "serving_default_input.1:0"
     input_shape = (1, 320, 40, 24);
-    #input_dtype = "float32"
     input_dtype = "int8"
-    shape_dict = {input_name: input_shape}
-    dtype_dict = {input_name: input_dtype}
-    model, params = relay.frontend.from_tflite(tflite_model, shape_dict, dtype_dict)
-elif network == "mobilenet_tflite":
-    # Now we can open mobilenet_v1_1.0_224.tflite
-    model_dir = "../mobilenet"
-    #tflite_model_file = os.path.join(model_dir, "op9_dla_fp32.tflite")
-    tflite_model_file = os.path.join(model_dir, "mobilenet_v1_1.0_224_quant.tflite")
-    tflite_model_buf = open(tflite_model_file, "rb").read()
-
-    # Get TFLite model from buffer
-    try:
-        import tflite
-        tflite_model = tflite.Model.GetRootAsModel(tflite_model_buf, 0)
-    except AttributeError:
-        import tflite.Model
-        tflite_model = tflite.Model.Model.GetRootAsModel(tflite_model_buf, 0)
-    input_name = "input"
-    input_shape = (1, 224, 224, 3);
     #input_dtype = "float32"
-    input_dtype = "uint8"
     shape_dict = {input_name: input_shape}
     dtype_dict = {input_name: input_dtype}
+    # convert the model to ir module
     model, params = relay.frontend.from_tflite(tflite_model, shape_dict, dtype_dict)
 
-
-
-if device_type == "x86_64":
+if target_type == "x86_64":
     target = tvm.target.Target("llvm")
-elif device_type == "armv7":
+elif target_type == "armv7":
     target = tvm.target.Target("llvm -device=arm_cpu -mtriple=armv7l-linux-gnueabihf -mattr=+neon")
-elif device_type == "aarch64":
-    #target = tvm.target.Target("llvm -device=arm_cpu -mtriple=aarch64-linux-gnu -mcpu=cortex-a55 -mattr=+neon,+v8.2a,+dotprod")
+elif target_type == "aarch64":
     target = tvm.target.Target("llvm -device=arm_cpu -mcpu=cortex-a55 -mtriple=aarch64-linux-gnu -mattr=+neon,+v8.2a,+dotprod")
-elif device_type == "opencl":
-    #target = tvm.target.Target("opencl", host="llvm -mtriple=aarch64-linux-gnu")
-    target = tvm.target.Target("opencl -device=powervr -max_num_threads=256 -thread_warp_size=1", host="llvm -device=arm_cpu -mtriple=aarch64-linux-gnu -mattr=+neon")
+elif target_type == "opencl":
+    target = tvm.target.Target("opencl", host="llvm -mtriple=aarch64-linux-gnu")
 
-if device_key == "v9h":
-    #rpc_host = "192.168.105.70"
-    rpc_host = "192.168.1.18"
-    rpc_port = 9190
-elif device_key == "rasp":
-    rpc_host = "192.168.0.109"
-    rpc_port = 9190
-print("device:", device_key)
-print("rpc_host: %s:%s" % (rpc_host, rpc_port))
-
-
-temp_log_filename = "%s-%s-%s-%s-C%s-T%s.log" % (device_key, network, layout, device_type, turn_trials, 
+log_file_path = "auto_tvm_log/"
+temp_log_filename = "%s-%s-%s-%s-C%s-T%s.log" % (device_key, network_name, layout, target_type, turn_trials, 
                                             time.strftime('%y-%m-%d-%H-%M',time.localtime(time.time())))
-log_filename = "%s-%s-%s-%s.log" % (device_key, network, layout, device_type)
+log_filename = "%s-%s-%s-%s.log" % (device_key, network_name, layout, target_type)
+# create tmp log file name and log file name
+tmp_log_file = log_file_path + temp_log_filename + ".tmp"
+log_file     = log_file_path + log_filename
 print("temp log file: name:", temp_log_filename)
 print("log file: name:", log_filename)
 
-log_file_path = "./auto_tvm_log/"
 
 if layout == 'NHWC':
     # convert from NCHW to NHWC
     desired_layouts = {'nn.conv2d': ['NHWC', 'default']}
-
     # Convert the layout to NHWC
     # RemoveUnunsedFunctions is used to clean up the graph.
     seq = tvm.transform.Sequential([relay.transform.RemoveUnusedFunctions(),
                                     relay.transform.ConvertLayout(desired_layouts)])
-
     with tvm.transform.PassContext(opt_level=3):
         model = seq(model)
 
 if turn_enable:
-    if device_type == "x86_64":
+    if target_type == "x86_64":
         #Set number of threads used for tuning based on the number of
         # physical CPU cores on your machine.
         num_threads = 8
@@ -196,7 +159,7 @@ if turn_enable:
                 enable_cpu_cache_flush=True
             ),
         )
-    elif device_type == "armv7" or device_type == "aarch64":
+    elif target_type == "armv7" or target_type == "aarch64":
         measure_option = autotvm.measure_option(
             builder = autotvm.LocalBuilder(build_func="ndk" if use_ndk else "default"),
             runner  = autotvm.RPCRunner(
@@ -208,7 +171,7 @@ if turn_enable:
                 enable_cpu_cache_flush = True
             ),
         )
-    elif device_type == "opencl":
+    elif target_type == "opencl":
         measure_option = autotvm.measure_option(
             builder = autotvm.LocalBuilder(build_func="ndk" if use_ndk else "default"),
             runner  = autotvm.RPCRunner(
@@ -222,30 +185,15 @@ if turn_enable:
             ),
         )
 
-
     # extract workloads from relay program
     print("Extract tasks...")
     tasks = autotvm.task.extract_from_program(
         model["main"], target=target, params=params, ops=(relay.op.get("nn.conv2d"), relay.op.get("nn.dense"))
     )
 
-    #print("task configure space:", tasks.config_space)
     for idx, task in enumerate(tasks):
         print("========== Task %d (function name: %s) [%f GFLOPS] ==========" % (idx, task.name, task.flop * 1.0e-6))
-        #print("task configure space:", task.config_space)
         print(task.args)
-        #print(task.func)
-        #print(task.flop)
-        #print(task.target)
-        #print(task.target_host)
-
-
-    # create tmp log file
-    tmp_log_file = log_file_path + temp_log_filename + ".tmp"
-    log_file     = log_file_path + log_filename
-
-    #if os.path.exists(tmp_log_file):
-    #    os.remove(tmp_log_file)
 
     # run tuning tasks
     print("Tuning...")
@@ -286,7 +234,7 @@ if turn_enable:
         )
 
 
-    if device_type == "x86_64":
+    if target_type == "x86_64":
         # Use graph tuner to achieve graph level optimal schedules
         # Set use_DP=False if it takes too long to finish.
         use_DP = True
@@ -299,10 +247,9 @@ if turn_enable:
     else:
         # pick best records to a cache file
         autotvm.record.pick_best(tmp_log_file, log_file)
-        #os.remove(tmp_log_file)
+    if os.path.exists(tmp_log_file):
+        os.remove(tmp_log_file)
 else:
-    log_file = log_file_path + log_filename
-
     # extract workloads from relay program
     print("Extract tasks...")
     tasks = autotvm.task.extract_from_program(
@@ -327,7 +274,7 @@ with autotvm.apply_history_best(log_file):
     print(dev_module)
     #source_code = dev_module.imported_modules()
 
-    if device_type == "x86_64":
+    if target_type == "x86_64":
         # upload parameters to device
         dev = tvm.cpu()
         module = runtime.GraphModule(lib["default"](dev))
@@ -335,39 +282,31 @@ with autotvm.apply_history_best(log_file):
         #  export library
         print("Export library...")
         temp = utils.tempdir()
-        exp_lib_name = device_type + "_deploy_lib.tar"
+        exp_lib_name = target_type + "_deploy_lib.tar"
         path_lib = temp.relpath(exp_lib_name)
         lib.export_library(path_lib)
-
-        exp_lib_path = "./" + device_type + "_deploy_lib.so"
-        lib.export_library(exp_lib_path,cc="/home/guohua.zhu/Workspace/toolchains/gcc-7.5.0-aarch64-linux-gnu/bin/aarch64-linux-gnu-g++")
         print("Lib:", exp_lib_name)
-        # lib.export_library(path_lib, ndk.create_shared)
 
         print("=============== Request Remote ===============")
         remote = request_remote(device_key, rpc_host, rpc_port)
-        config_func = remote.get_function('runtime.config_threadpool')
-        config_func(core_type, core_num)
 
         # upload module to device
         print("Load Module...")
         remote.upload(path_lib)
         loaded_lib = remote.load_module(exp_lib_name)
         # configure the device
-        if device_type == "armv7":
+        if target_type == "armv7":
             dev = remote.cpu()
-        elif device_type == "aarch64":
+        elif target_type == "aarch64":
             dev = remote.cpu()
-            #dev = remote.device("llvm -device=arm_cpu -mtriple=aarch64-linux-gnu -mattr=+v8.2a,+dotprod", 0)
-        elif device_type == "opencl":
+            config_func = remote.get_function('runtime.config_threadpool')
+            config_func(core_type, core_num)
+        elif target_type == "opencl":
             dev = remote.cl()
         # Create graph executor
         module = runtime.GraphModule(loaded_lib["default"](dev))
 
-        # module = graph_executor.GraphModule(loaded_lib["default"](dev))
-
     module.set_input(input_name, tvm.nd.array((np.random.uniform(size=input_shape)).astype(input_dtype)))
-
     # Evaluate
     print("Evaluate inference time cost...")
     ftimer = module.module.time_evaluator("run", dev, repeat=3, min_repeat_ms=50)

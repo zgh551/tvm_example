@@ -15,7 +15,7 @@ import tvm.relay as relay
 
 target_type = sys.argv[1]
 
-mnist_model = onnx.load('mnist/mnist-8.onnx')
+mnist_model = onnx.load('../pretrained_models/mnist/mnist-8.onnx')
 
 input_name = "Input3"
 shape_dict = {input_name: (1, 1, 28, 28)}
@@ -30,7 +30,6 @@ elif target_type == 'aarch64':
     target_host = tvm.target.Target("llvm -device=arm_cpu -mtriple=aarch64-linux-gnu -mattr=+neon")
 elif target_type == 'opencl':
     target      = tvm.target.Target("opencl -device=mali")
-    #target      = tvm.target.Target("opencl -device=intel_graphics")
     target_host = tvm.target.Target("llvm -device=arm_cpu -mtriple=aarch64-linux-gnu -mattr=+neon")
                                         
 print(target)

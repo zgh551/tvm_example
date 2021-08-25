@@ -12,43 +12,109 @@ echo "-->   [4]   |   all      |"
 echo -n "Enter target type number: "
 read n
 
+echo "---| number | models         |"
+echo "-->   [1]   | mnist          |"
+echo "-->   [2]   | mobilenet      |"
+echo "-->   [3]   | op9_dla_onnx   |"
+echo "-->   [4]   | op9_dla_tflite |"
+echo -n "Enter model number: "
+read m
+
+
 x86_64_func(){
-    python3 python/tune_schedule.py x86_64
+    case $m in
+    1)
+        echo "for mnist"
+        python3 python/AutoTVM.py x86_64 mnist
+        ;;
+    2)
+        echo "for mobilenet"
+        python3 python/AutoTVM.py x86_64 mobilenet
+        ;;
+    3)
+        echo "for op9_dla_onnx"
+        python3 python/AutoTVM.py x86_64 op9_dla_onnx
+        ;;
+    4)
+        echo "for op9_dla_tflite"
+        python3 python/AutoTVM.py x86_64 op9_dla_tflite
+        ;;
+    *)
+        echo "None model" 
+        ;;
+    esac
 }
         
 aarch64_func(){
-    python3 python/tune_schedule.py aarch64
+    case $m in
+    1)
+        echo "for mnist"
+        python3 python/AutoTVM.py aarch64 mnist
+        ;;
+    2)
+        echo " for mobilenet"
+        python3 python/AutoTVM.py aarch64 mobilenet
+        ;;
+    3)
+        echo "for op9_dla_onnx"
+        python3 python/AutoTVM.py aarch64 op9_dla_onnx
+        ;;
+    4)
+        echo "for op9_dla_tflite"
+        python3 python/AutoTVM.py aarch64 op9_dla_tflite
+        ;;
+    *)
+        echo "None model" 
+        ;;
+    esac
 }
         
 opencl_func(){
-    python3 python/tune_schedule.py opencl
+    case $m in
+    1)
+        echo "for mnist"
+        python3 python/AutoTVM.py opencl mnist
+        ;;
+    2)
+        echo " for mobilenet"
+        python3 python/AutoTVM.py opencl mobilenet
+        ;;
+    3)
+        echo "for op9_dla_onnx"
+        python3 python/AutoTVM.py opencl op9_dla_onnx
+        ;;
+    4)
+        echo "for op9_dla_tflite"
+        python3 python/AutoTVM.py opencl op9_dla_tflite
+        ;;
+    *)
+        echo "None model" 
+        ;;
+    esac
 }
 
 
 case $n in
 1)
-    echo "x86_64 build"
+    echo -n "x86_64 build "
     x86_64_func
     ;;
 2)
-    echo "aarch64 build"
+    echo -n "aarch64 build "
     aarch64_func
     ;;
 3)
-    echo "opencl build"
+    echo -n "opencl build "
     opencl_func
     ;;
 4)
-    echo "all build"
+    echo -n "all build "
     x86_64_func
     aarch64_func
     opencl_func
     ;;
 *)
-    echo "invalid"
+    echo "invalid build "
     ;;
 esac
-
-
-
 
