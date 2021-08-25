@@ -19,17 +19,18 @@ from tvm.contrib.download import download_testdata
 logging.getLogger("autotvm").setLevel(logging.DEBUG)
 logging.getLogger("autotvm").addHandler(logging.StreamHandler(sys.stdout))
 
+# The following is my environment, change this to the IP address of
+# your target device
+host = "192.168.104.240"
+port = 9090
+# selecrt whether model quantify
 quantify_enable = True
+# configure the cpu cores
 core_type = -1
 core_num  = 2
 # get the target device type 
 target_type  = sys.argv[1]
 network_name = sys.argv[2]
-
-#network_name = "mnist"
-#network_name = "mobilenet"
-#network_name = "op9_dla_onnx"
-#network_name = "op9_dla_tflite"
 
 pretrained_model_path = "../pretrained_models"
 # load the nn model
@@ -85,7 +86,6 @@ elif network_name == "op9_dla_tflite":
     model_path = os.path.join(pretrained_model_path, "op9_dla/tflite/op9_dla_int8.tflite")
     #model_path = os.path.join(pretrained_model_path, "op9_dla/tflite/op9_dla_fp32.tflite")
     tflite_model_buf = open(model_path, "rb").read()
-
     # Get TFLite model from buffer
     try:
         import tflite
@@ -103,10 +103,6 @@ elif network_name == "op9_dla_tflite":
     # convert the model to ir module
     model, params = relay.frontend.from_tflite(tflite_model, shape_dict, dtype_dict)
 
-# The following is my environment, change this to the IP address of
-# your target device
-host = "192.168.104.240"
-port = 9090
 
 if target_type == 'x86_64':
     target = tvm.target.Target('llvm')

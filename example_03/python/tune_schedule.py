@@ -39,8 +39,8 @@ network = "mnist"
 batch_size = 1
 layout = "NCHW"
 
-turn_trials = 200
-turn_enable = True
+tune_trials = 200
+tune_enable = True
 preload_log_file = False
 use_ndk = False
 
@@ -53,10 +53,10 @@ elif target_type == 'opencl':
 print("device:", target)
 
 # set the name of log file
-log_file = "%s-%s-B%d-%s-C%s-T%s.json" % (network, layout, batch_size, target.kind.name, turn_trials, time.strftime('%y-%m-%d-%H-%M',time.localtime(time.time())))
+log_file = "%s-%s-B%d-%s-C%s-T%s.json" % (network, layout, batch_size, target.kind.name, tune_trials, time.strftime('%y-%m-%d-%H-%M',time.localtime(time.time())))
 print("log file:", log_file)
 
-if turn_enable:
+if tune_enable:
     if target_type == 'opencl':
         num_cores = 2
         vector_unit_bytes = 16
@@ -98,7 +98,7 @@ if turn_enable:
 
     # configure the tune option parameter
     tune_option = auto_scheduler.TuningOptions(
-        num_measure_trials=turn_trials,  # change this to 20000 to achieve the best performance
+        num_measure_trials=tune_trials,  # change this to 20000 to achieve the best performance
         builder=auto_scheduler.LocalBuilder(build_func="ndk" if use_ndk else "default"),
         runner=auto_scheduler.RPCRunner(device_key, host=rpc_host, port=rpc_port, repeat=3, timeout=50),
         measure_callbacks=[auto_scheduler.RecordToFile(log_file)],
@@ -110,7 +110,7 @@ if turn_enable:
 # Compile the whole network
 print("=============== Compile...  ===============")
 # if the turn is disabled, can load the exist log file
-if not turn_enable:
+if not tune_enable:
     log_file = "xxx.json"
 print("Load File:", log_file)
 with auto_scheduler.ApplyHistoryBest(log_file):

@@ -17,10 +17,10 @@ import logging
 import sys
 
 # configure whether enable tune
-turn_enable = False  
+tune_enable = False  
 use_transfer_learning = True 
 # configure the tune parameters
-turn_trials = 1000
+tune_trials = 1000
 early_stopping = 800
 tuner = "xgb"
 # Set this to True if you use ndk tools for cross compiling
@@ -123,7 +123,7 @@ elif target_type == "opencl":
     target = tvm.target.Target("opencl", host="llvm -mtriple=aarch64-linux-gnu")
 
 log_file_path = "auto_tvm_log/"
-temp_log_filename = "%s-%s-%s-%s-C%s-T%s.log" % (device_key, network_name, layout, target_type, turn_trials, 
+temp_log_filename = "%s-%s-%s-%s-C%s-T%s.log" % (device_key, network_name, layout, target_type, tune_trials, 
                                             time.strftime('%y-%m-%d-%H-%M',time.localtime(time.time())))
 log_filename = "%s-%s-%s-%s.log" % (device_key, network_name, layout, target_type)
 # create tmp log file name and log file name
@@ -143,7 +143,7 @@ if layout == 'NHWC':
     with tvm.transform.PassContext(opt_level=3):
         model = seq(model)
 
-if turn_enable:
+if tune_enable:
     if target_type == "x86_64":
         #Set number of threads used for tuning based on the number of
         # physical CPU cores on your machine.
@@ -222,7 +222,7 @@ if turn_enable:
                 tuner_obj.load_history(autotvm.record.load_from_file(log_file))
 
         # process tuning
-        tsk_trial = min(turn_trials, len(tsk.config_space))
+        tsk_trial = min(tune_trials, len(tsk.config_space))
         tuner_obj.tune(
             n_trial=tsk_trial,
             early_stopping=early_stopping,
