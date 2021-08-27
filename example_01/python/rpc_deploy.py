@@ -9,6 +9,13 @@ import onnx
 import os
 import glob
 from onnx import numpy_helper
+
+from google.protobuf import text_format
+#from tvm.relay.frontend import caffe_pb2 as pb
+#import caffe
+#from caffe import layers as L, params as P
+#from caffe.proto import caffe_pb2 as pb
+
 import tvm
 from tvm import te
 import tvm.relay as relay
@@ -27,10 +34,14 @@ port = 9090
 quantify_enable = True
 # configure the cpu cores
 core_type = -1
-core_num  = 2
+core_num  = 6
 # get the target device type 
 target_type  = sys.argv[1]
 network_name = sys.argv[2]
+#network_name = "jreg_caffe"
+#network_name = "jreg_onnx"
+network_name = "jseg_caffe"
+#network_name = "yfast_onnx"
 
 pretrained_model_path = "../pretrained_models"
 # load the nn model
@@ -82,7 +93,6 @@ elif network_name == "op9_dla_onnx":
             quan_model = relay.quantize.quantize(model, params)
 elif network_name == "op9_dla_tflite":
     # Now we can open mobilenet_v1_1.0_224.tflite
-    model_dir = "op9_dla"
     model_path = os.path.join(pretrained_model_path, "op9_dla/tflite/op9_dla_int8.tflite")
     #model_path = os.path.join(pretrained_model_path, "op9_dla/tflite/op9_dla_fp32.tflite")
     tflite_model_buf = open(model_path, "rb").read()
@@ -102,6 +112,54 @@ elif network_name == "op9_dla_tflite":
     dtype_dict = {input_name: input_dtype}
     # convert the model to ir module
     model, params = relay.frontend.from_tflite(tflite_model, shape_dict, dtype_dict)
+
+elif network_name == "jreg_caffe":
+    # configure the model net
+    init_net = os.path.join(pretrained_model_path, "jreg_288hx240w/caffemodel/jreg.caffemodel")
+    predict_net = os.path.join(pretrained_model_path, "jreg_288hx240w/caffemodel/jreg_deploy.prototxt")
+    # configure the model input ,shape ans type
+    input_name = "data"
+    input_shape = (1, 3, 288, 240);
+    input_dtype = "float32"
+    shape_dict = {input_name: input_shape}
+    dtype_dict = {input_name: input_dtype}
+    # convert the model to ir module
+    model, params = relay.frontend.from_caffe2(init_net, predict_net, shape_dict, dtype_dict)
+
+elif network_name == "jreg_onnx":
+    model_path = os.path.join(pretrained_model_path, "jreg_288hx240w/onnx/JSeg_optset11.onnx")
+    onnx_model = onnx.load(model_path)
+    # configure the model input ,shape ans type
+    input_name = "input.1"
+    input_shape = (1, 3, 288, 240);
+    input_dtype = "float32"
+    shape_dict = {input_name: input_shape}
+    dtype_dict = {input_name: input_dtype}
+    # convert the model to ir module
+    model, params = relay.frontend.from_onnx(onnx_model, shape_dict, dtype_dict)
+elif network_name == "jseg_caffe":
+    # configure the model net
+    init_net = os.path.join(pretrained_model_path, "jseg_224hx256w/jseg.caffemodel")
+    predict_net = os.path.join(pretrained_model_path, "jseg_224hx256w/deploy_256x224.prototxt")
+    # configure the model input ,shape ans type
+    input_name = "data"
+    input_shape = (1, 3, 224, 256);
+    input_dtype = "float32"
+    shape_dict = {input_name: input_shape}
+    dtype_dict = {input_name: input_dtype}
+    # convert the model to ir module
+    model, params = relay.frontend.from_caffe2(init_net, predict_net, shape_dict, dtype_dict)
+elif network_name == "yfast_onnx":
+    model_path = os.path.join(pretrained_model_path, "yfast_128hx128w/yfast_128x128.onnx")
+    onnx_model = onnx.load(model_path)
+    # configure the model input ,shape ans type
+    input_name = "input"
+    input_shape = (1, 3, 128, 128);
+    input_dtype = "float32"
+    shape_dict = {input_name: input_shape}
+    dtype_dict = {input_name: input_dtype}
+    # convert the model to ir module
+    model, params = relay.frontend.from_onnx(onnx_model, shape_dict, dtype_dict)
 
 
 if target_type == 'x86_64':
