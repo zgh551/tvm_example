@@ -19,30 +19,108 @@ target_type = sys.argv[1]
 
 # Also replace this with the device key in your tracker
 device_key = "v9h" # rename as your device chip type 
-rpc_host = "192.168.105.70" # replace your pc host ip
+rpc_host = "192.168.1.18" # replace your pc host ip
 rpc_port = 9190 # replace the tracker server port
 print("target device:", device_key)
 print("rpc_host: %s:%s" % (rpc_host, rpc_port))
 
-mnist_model = onnx.load('mnist/mnist-8.onnx')
-
-input_name = "Input3"
-dtype = "float32"
-input_shape = (1, 1, 28, 28)
-shape_dict = {input_name: input_shape}
-print("shape_dict: ", shape_dict)
-
-model, params = relay.frontend.from_onnx(mnist_model, shape_dict)
-
+core_type = -1
+core_num  = 6
 # Define the neural network and compilation target.
-network = "mnist"
 batch_size = 1
 layout = "NCHW"
 
-tune_trials = 200
-tune_enable = True
-preload_log_file = False
+tune_trials = 2000
+tune_enable = True 
+preload_log_file = False 
 use_ndk = False
+
+
+#network_name = "model-01"
+#network_name = "model-01-half"
+network_name = "model-01-half-right"
+pretrained_model_path = "../pretrained_models"
+
+if network_name == "model-01":
+    # configure the model net
+    blob_file  = os.path.join(pretrained_model_path, "model-01/model_best_20210826.caffemodel")
+    proto_file = os.path.join(pretrained_model_path, "model-01/model_best_20210826.prototxt")
+    # configure the model input ,shape ans type
+    input_name = "data"
+    input_shape = (1, 3, 424, 336);
+    input_dtype = "float32"
+    shape_dict = {input_name: input_shape}
+    dtype_dict = {input_name: input_dtype}
+    if False:
+        # convert the model to ir module
+        model, params = relay.frontend.from_caffe2(blob_file, proto_file, shape_dict, dtype_dict)
+    else:
+        from google.protobuf import text_format
+        #from tvm.relay.frontend import caffe_pb2 as pb
+        import caffe
+        from caffe import layers as L, params as P
+        from caffe.proto import caffe_pb2 as pb
+        init_net = pb.NetParameter()
+        predict_net = pb.NetParameter()
+
+        # load model
+        with open(proto_file, "r") as f:
+            text_format.Merge(f.read(), predict_net)
+        # load blob
+        with open(blob_file, "rb") as f:
+            init_net.ParseFromString(f.read())
+
+        model, params = relay.frontend.from_caffe(init_net, predict_net, shape_dict, dtype_dict)
+elif network_name == "model-01-half":
+    # configure the model net
+    blob_file  = os.path.join(pretrained_model_path, "model-01-half/small_6303_0_1lr11_iter_80000.caffemodel")
+    proto_file = os.path.join(pretrained_model_path, "model-01-half/deploy_halfsize.prototxt")
+    # configure the model input ,shape ans type
+    input_name = "data"
+    input_shape = (1, 3, 640, 480);
+    input_dtype = "float32"
+    shape_dict = {input_name: input_shape}
+    dtype_dict = {input_name: input_dtype}
+    if False:
+        # convert the model to ir module
+        model, params = relay.frontend.from_caffe2(blob_file, proto_file, shape_dict, dtype_dict)
+    else:
+        from google.protobuf import text_format
+        import caffe
+        from caffe import layers as L, params as P
+        from caffe.proto import caffe_pb2 as pb
+        init_net = pb.NetParameter()
+        predict_net = pb.NetParameter()
+
+        # load model
+        with open(proto_file, "r") as f:
+            text_format.Merge(f.read(), predict_net)
+        # load blob
+        with open(blob_file, "rb") as f:
+            init_net.ParseFromString(f.read())
+
+        model, params = relay.frontend.from_caffe(init_net, predict_net, shape_dict, dtype_dict)
+elif network_name == "model-01-half-right":
+    onnx_file  = os.path.join(pretrained_model_path, "model-01-half-right/model_best_20210826_half_right.onnx")
+    onnx_model = onnx.load(onnx_file)
+
+    input_name = "input.1"
+    input_dtype = "float32"
+    input_shape = (1, 3, 424, 336)
+    shape_dict = {input_name: input_shape}
+    dtype_dict = {input_name: input_dtype}
+
+    model, params = relay.frontend.from_onnx(onnx_model, shape_dict, dtype_dict)
+elif network_name == "mnist":
+    mnist_model = onnx.load('mnist/mnist-8.onnx')
+
+    input_name = "Input3"
+    dtype = "float32"
+    input_shape = (1, 1, 28, 28)
+    shape_dict = {input_name: input_shape}
+    print("shape_dict: ", shape_dict)
+
+    model, params = relay.frontend.from_onnx(mnist_model, shape_dict)
 
 if target_type == 'x86_64':
     target = tvm.target.Target('llvm')
@@ -53,7 +131,7 @@ elif target_type == 'opencl':
 print("device:", target)
 
 # set the name of log file
-log_file = "%s-%s-B%d-%s-C%s-T%s.json" % (network, layout, batch_size, target.kind.name, tune_trials, time.strftime('%y-%m-%d-%H-%M',time.localtime(time.time())))
+log_file = "%s-%s-B%d-%s-C%s-T%s.json" % (network_name, layout, batch_size, target.kind.name, tune_trials, time.strftime('%y-%m-%d-%H-%M',time.localtime(time.time())))
 print("log file:", log_file)
 
 if tune_enable:
@@ -62,7 +140,7 @@ if tune_enable:
         vector_unit_bytes = 16
         cache_line_bytes  = 64
         max_shared_memory_per_block = 4096
-        max_local_memory_per_block  = 40960
+        max_local_memory_per_block  = 409600
         max_threads_per_block = 512
         max_vthread_extent = 2
         warp_size = 2
@@ -90,7 +168,10 @@ if tune_enable:
     print("=============== Begin tuning... ===============")
     if preload_log_file:
         # if have the log file for scheduler, repalce follow name of file:
-        load_log_file = "xxx.json"
+        load_log_file = "model-01-NCHW-B1-opencl-C2000-T21-08-29-15-57.json"
+        load_log_file = "model-01-NCHW-B1-opencl-C2000-T21-08-29-21-56.json"
+        load_log_file = "model-01-NCHW-B1-opencl.json"
+        load_log_file = "model-01-half-NCHW-B1-opencl.json"
         print("preload file:", load_log_file)
         tuner = auto_scheduler.TaskScheduler(tasks, task_weights, load_log_file=load_log_file)
     else:
@@ -106,12 +187,12 @@ if tune_enable:
     
     # begin tune
     tuner.tune(tune_option)
-
+else:
+    log_file = "model-01-NCHW-B1-opencl-C2000-T21-08-29-21-56.json"
+    log_file = "model-01-NCHW-B1-opencl.json"
 # Compile the whole network
 print("=============== Compile...  ===============")
 # if the turn is disabled, can load the exist log file
-if not tune_enable:
-    log_file = "xxx.json"
 print("Load File:", log_file)
 with auto_scheduler.ApplyHistoryBest(log_file):
     with tvm.transform.PassContext(opt_level=3, config={"relay.backend.use_auto_scheduler": True}):
@@ -120,14 +201,17 @@ with auto_scheduler.ApplyHistoryBest(log_file):
 # Create graph executor
 print("=============== Request Remote ===============")
 if target_type == 'x86_64':
-    #remote = rpc.LocalSession()
-    remote = request_remote(device_key, rpc_host, rpc_port)
+    remote = rpc.LocalSession()
+    #remote = request_remote(device_key, rpc_host, rpc_port)
     dev = remote.cpu(0)
 elif target_type == 'aarch64':
     remote = request_remote(device_key, rpc_host, rpc_port)
     dev = remote.cpu()
+    # configure the number of cpu running cores
+    config_func = remote.get_function('runtime.config_threadpool')
+    config_func(core_type, core_num)
 elif target_type == 'opencl':
-    remote = request_remote(device_key, rpc_host, rpc_port)
+    remote = request_remote(device_key, rpc_host, rpc_port, timeout=10000)
     dev = remote.cl()
 
 # load model to remote device and set random input data
@@ -139,13 +223,13 @@ lib.export_library(path_lib)
 remote.upload(path_lib)
 loaded_lib = remote.load_module(filename)
 module = graph_executor.GraphModule(loaded_lib["default"](dev))
-data = (np.random.uniform(size=input_shape)).astype(dtype)
+data = (np.random.uniform(size=input_shape)).astype(input_dtype)
 data_tvm = tvm.nd.array(data)
 module.set_input(input_name, data_tvm)
 
 # Evaluate
 print("Evaluate inference time cost...")
-ftimer = module.module.time_evaluator("run", dev, repeat=3, min_repeat_ms=500)
+ftimer = module.module.time_evaluator("run", dev, number=50, repeat=3, min_repeat_ms=200)
 prof_res = np.array(ftimer().results) * 1e3  # convert to millisecond
 print("Mean inference time (std dev): %.2f ms (%.2f ms)" % (np.mean(prof_res), np.std(prof_res)))
 

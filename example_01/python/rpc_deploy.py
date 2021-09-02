@@ -12,9 +12,9 @@ from onnx import numpy_helper
 
 from google.protobuf import text_format
 #from tvm.relay.frontend import caffe_pb2 as pb
-#import caffe
-#from caffe import layers as L, params as P
-#from caffe.proto import caffe_pb2 as pb
+import caffe
+from caffe import layers as L, params as P
+from caffe.proto import caffe_pb2 as pb
 
 import tvm
 from tvm import te
@@ -23,9 +23,11 @@ from tvm import rpc
 from tvm.contrib import utils, graph_executor as runtime
 from tvm.contrib.download import download_testdata
 
+#logging.getLogger("autotvm").setLevel(logging.INFO)
 logging.getLogger("autotvm").setLevel(logging.DEBUG)
 logging.getLogger("autotvm").addHandler(logging.StreamHandler(sys.stdout))
 
+os.environ["TVM_BACKTRACE"] = str(1)
 # The following is my environment, change this to the IP address of
 # your target device
 host = "192.168.104.240"
@@ -39,9 +41,12 @@ core_num  = 6
 target_type  = sys.argv[1]
 network_name = sys.argv[2]
 #network_name = "jreg_caffe"
-#network_name = "jreg_onnx"
-network_name = "jseg_caffe"
+network_name = "jreg_onnx"
+#network_name = "jseg_caffe"
 #network_name = "yfast_onnx"
+#network_name = "model-01"
+#network_name = "model-02"
+#network_name = "model-03"
 
 pretrained_model_path = "../pretrained_models"
 # load the nn model
@@ -115,17 +120,31 @@ elif network_name == "op9_dla_tflite":
 
 elif network_name == "jreg_caffe":
     # configure the model net
-    init_net = os.path.join(pretrained_model_path, "jreg_288hx240w/caffemodel/jreg.caffemodel")
-    predict_net = os.path.join(pretrained_model_path, "jreg_288hx240w/caffemodel/jreg_deploy.prototxt")
+    blob_file = os.path.join(pretrained_model_path, "jreg_288hx240w/caffemodel/jreg.caffemodel")
+    #proto_file = os.path.join(pretrained_model_path, "jreg_288hx240w/caffemodel/jreg_deploy_revise3.prototxt")
+    proto_file = os.path.join(pretrained_model_path, "jreg_288hx240w/caffemodel/jreg_deploy.prototxt")
     # configure the model input ,shape ans type
     input_name = "data"
     input_shape = (1, 3, 288, 240);
     input_dtype = "float32"
     shape_dict = {input_name: input_shape}
     dtype_dict = {input_name: input_dtype}
-    # convert the model to ir module
-    model, params = relay.frontend.from_caffe2(init_net, predict_net, shape_dict, dtype_dict)
+    if False:
+        # convert the model to ir module
+        model, params = relay.frontend.from_caffe2(blob_file, proto_file, shape_dict, dtype_dict)
+    else:
+        init_net = pb.NetParameter()
+        predict_net = pb.NetParameter()
 
+        # load model
+        with open(proto_file, "r") as f:
+            text_format.Merge(f.read(), predict_net)
+        # load blob
+        with open(blob_file, "rb") as f:
+            init_net.ParseFromString(f.read())
+
+        model, params = relay.frontend.from_caffe(init_net, predict_net, shape_dict, dtype_dict)
+        #print(model)
 elif network_name == "jreg_onnx":
     model_path = os.path.join(pretrained_model_path, "jreg_288hx240w/onnx/JSeg_optset11.onnx")
     onnx_model = onnx.load(model_path)
@@ -136,19 +155,32 @@ elif network_name == "jreg_onnx":
     shape_dict = {input_name: input_shape}
     dtype_dict = {input_name: input_dtype}
     # convert the model to ir module
+    #onnx_model = relay.transform.DynamicToStatic()(onnx_model)
     model, params = relay.frontend.from_onnx(onnx_model, shape_dict, dtype_dict)
 elif network_name == "jseg_caffe":
     # configure the model net
-    init_net = os.path.join(pretrained_model_path, "jseg_224hx256w/jseg.caffemodel")
-    predict_net = os.path.join(pretrained_model_path, "jseg_224hx256w/deploy_256x224.prototxt")
+    blob_file = os.path.join(pretrained_model_path, "jseg_224hx256w/jseg.caffemodel")
+    proto_file = os.path.join(pretrained_model_path, "jseg_224hx256w/deploy_256x224.prototxt")
     # configure the model input ,shape ans type
     input_name = "data"
     input_shape = (1, 3, 224, 256);
     input_dtype = "float32"
     shape_dict = {input_name: input_shape}
     dtype_dict = {input_name: input_dtype}
-    # convert the model to ir module
-    model, params = relay.frontend.from_caffe2(init_net, predict_net, shape_dict, dtype_dict)
+    if False:
+        # convert the model to ir module
+        model, params = relay.frontend.from_caffe2(blob_file, proto_file, shape_dict, dtype_dict)
+    else:
+        init_net = pb.NetParameter()
+        predict_net = pb.NetParameter()
+
+        # load model
+        with open(proto_file, "r") as f:
+            text_format.Merge(f.read(), predict_net)
+        # load blob
+        with open(blob_file, "rb") as f:
+            init_net.ParseFromString(f.read())
+        model, params = relay.frontend.from_caffe(init_net, predict_net, shape_dict, dtype_dict)
 elif network_name == "yfast_onnx":
     model_path = os.path.join(pretrained_model_path, "yfast_128hx128w/yfast_128x128.onnx")
     onnx_model = onnx.load(model_path)
@@ -160,6 +192,82 @@ elif network_name == "yfast_onnx":
     dtype_dict = {input_name: input_dtype}
     # convert the model to ir module
     model, params = relay.frontend.from_onnx(onnx_model, shape_dict, dtype_dict)
+elif network_name == "model-01":
+    # configure the model net
+    blob_file  = os.path.join(pretrained_model_path, "model-01/model_best_20210826.caffemodel")
+    proto_file = os.path.join(pretrained_model_path, "model-01/model_best_20210826.prototxt")
+    # configure the model input ,shape ans type
+    input_name = "data"
+    input_shape = (1, 3, 424, 336);
+    input_dtype = "float32"
+    shape_dict = {input_name: input_shape}
+    dtype_dict = {input_name: input_dtype}
+    if False:
+        # convert the model to ir module
+        model, params = relay.frontend.from_caffe2(blob_file, proto_file, shape_dict, dtype_dict)
+    else:
+        init_net = pb.NetParameter()
+        predict_net = pb.NetParameter()
+
+        # load model
+        with open(proto_file, "r") as f:
+            text_format.Merge(f.read(), predict_net)
+        # load blob
+        with open(blob_file, "rb") as f:
+            init_net.ParseFromString(f.read())
+
+        model, params = relay.frontend.from_caffe(init_net, predict_net, shape_dict, dtype_dict)
+elif network_name == "model-02":
+    # configure the model net
+    blob_file  = os.path.join(pretrained_model_path, "model-02/20200411_bgr_56_iter_40000.caffemodel")
+    proto_file = os.path.join(pretrained_model_path, "model-02/deploy.prototxt")
+    # configure the model input ,shape ans type
+    input_name = "data"
+    input_shape = (1, 3, 56, 56);
+    input_dtype = "float32"
+    shape_dict = {input_name: input_shape}
+    dtype_dict = {input_name: input_dtype}
+    if False:
+        # convert the model to ir module
+        model, params = relay.frontend.from_caffe2(blob_file, proto_file, shape_dict, dtype_dict)
+    else:
+        init_net = pb.NetParameter()
+        predict_net = pb.NetParameter()
+
+        # load model
+        with open(proto_file, "r") as f:
+            text_format.Merge(f.read(), predict_net)
+        # load blob
+        with open(blob_file, "rb") as f:
+            init_net.ParseFromString(f.read())
+
+        model, params = relay.frontend.from_caffe(init_net, predict_net, shape_dict, dtype_dict)
+elif network_name == "model-03":
+    # configure the model net
+    blob_file  = os.path.join(pretrained_model_path, "model-03/20210828_model.caffemodel")
+    proto_file = os.path.join(pretrained_model_path, "model-03/20210828_model.prototxt")
+    # configure the model input ,shape ans type
+    input_name = "blob1"
+    input_shape = (1, 3, 192, 320);
+    input_dtype = "float32"
+    shape_dict = {input_name: input_shape}
+    dtype_dict = {input_name: input_dtype}
+    if False:
+        # convert the model to ir module
+        model, params = relay.frontend.from_caffe2(blob_file, proto_file, shape_dict, dtype_dict)
+    else:
+        init_net = pb.NetParameter()
+        predict_net = pb.NetParameter()
+
+        # load model
+        with open(proto_file, "r") as f:
+            text_format.Merge(f.read(), predict_net)
+        # load blob
+        with open(blob_file, "rb") as f:
+            init_net.ParseFromString(f.read())
+
+        model, params = relay.frontend.from_caffe(init_net, predict_net, shape_dict, dtype_dict)
+
 
 
 if target_type == 'x86_64':

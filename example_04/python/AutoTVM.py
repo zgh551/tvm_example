@@ -17,11 +17,11 @@ import logging
 import sys
 
 # configure whether enable tune
-tune_enable = False  
+tune_enable = True  
 use_transfer_learning = True 
 # configure the tune parameters
-tune_trials = 1000
-early_stopping = 800
+tune_trials = 500
+early_stopping = 400
 tuner = "xgb"
 # Set this to True if you use ndk tools for cross compiling
 use_ndk = False
@@ -38,6 +38,7 @@ core_num  = 2
 # get the target device type 
 target_type  = sys.argv[1]
 network_name = sys.argv[2]
+network_name = "model-01"
 # configure the layout parameters
 batch_size = 1
 layout = "NCHW"
@@ -112,6 +113,36 @@ elif network_name == "op9_dla_tflite":
     dtype_dict = {input_name: input_dtype}
     # convert the model to ir module
     model, params = relay.frontend.from_tflite(tflite_model, shape_dict, dtype_dict)
+elif network_name == "model-01":
+    # configure the model net
+    blob_file  = os.path.join(pretrained_model_path, "model-01/model_best_20210826.caffemodel")
+    proto_file = os.path.join(pretrained_model_path, "model-01/model_best_20210826.prototxt")
+    # configure the model input ,shape ans type
+    input_name = "data"
+    input_shape = (1, 3, 424, 336);
+    input_dtype = "float32"
+    shape_dict = {input_name: input_shape}
+    dtype_dict = {input_name: input_dtype}
+    if False:
+        # convert the model to ir module
+        model, params = relay.frontend.from_caffe2(blob_file, proto_file, shape_dict, dtype_dict)
+    else:
+        from google.protobuf import text_format
+        #from tvm.relay.frontend import caffe_pb2 as pb
+        import caffe
+        from caffe import layers as L, params as P
+        from caffe.proto import caffe_pb2 as pb
+        init_net = pb.NetParameter()
+        predict_net = pb.NetParameter()
+
+        # load model
+        with open(proto_file, "r") as f:
+            text_format.Merge(f.read(), predict_net)
+        # load blob
+        with open(blob_file, "rb") as f:
+            init_net.ParseFromString(f.read())
+
+        model, params = relay.frontend.from_caffe(init_net, predict_net, shape_dict, dtype_dict)
 
 if target_type == "x86_64":
     target = tvm.target.Target("llvm")
@@ -120,7 +151,7 @@ elif target_type == "armv7":
 elif target_type == "aarch64":
     target = tvm.target.Target("llvm -device=arm_cpu -mcpu=cortex-a55 -mtriple=aarch64-linux-gnu -mattr=+neon,+v8.2a,+dotprod")
 elif target_type == "opencl":
-    target = tvm.target.Target("opencl", host="llvm -mtriple=aarch64-linux-gnu")
+    target = tvm.target.Target("opencl -device=mali -max_num_threads=512 -thread_warp_size=2", host="llvm -mtriple=aarch64-linux-gnu")
 
 log_file_path = "auto_tvm_log/"
 temp_log_filename = "%s-%s-%s-%s-C%s-T%s.log" % (device_key, network_name, layout, target_type, tune_trials, 
@@ -199,6 +230,8 @@ if tune_enable:
     print("Tuning...")
     for i, tsk in enumerate(reversed(tasks)):
         prefix = "[Task %2d/%2d] " % (i + 1, len(tasks))
+        if i < 12:
+            continue
         # create tuner
         if tuner == "xgb" or tuner == "xgb-rank":
             tuner_obj = XGBTuner(tsk, loss_type="rank")
@@ -218,8 +251,9 @@ if tune_enable:
             raise ValueError("Invalid tuner: " + tuner)
         
         if use_transfer_learning:
-            if os.path.isfile(log_file):
+            if os.path.exists(log_file):
                 tuner_obj.load_history(autotvm.record.load_from_file(log_file))
+                print("load history log file:", log_file)
 
         # process tuning
         tsk_trial = min(tune_trials, len(tsk.config_space))
@@ -247,8 +281,10 @@ if tune_enable:
     else:
         # pick best records to a cache file
         autotvm.record.pick_best(tmp_log_file, log_file)
+
     if os.path.exists(tmp_log_file):
         os.remove(tmp_log_file)
+        print("remove temp file:", tmp_log_file)
 else:
     # extract workloads from relay program
     print("Extract tasks...")
