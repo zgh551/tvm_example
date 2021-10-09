@@ -31,10 +31,10 @@ x86_64_func(){
     cd build_x86_64
     cmake ..
     make -j$(nproc)
-    cp mnist_test ../models/x86_64
+    cp mobilenet_run ../models/x86_64
     cd ..
     rm -rf build_x86_64
-    cp data/5.png models/x86_64
+    cp data/cat.png models/x86_64
 }
         
 aarch64_func(){
@@ -58,10 +58,10 @@ aarch64_func(){
           -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH ..
 
     make -j$(nproc)
-    cp mnist_test ../models/aarch64
+    cp mobilenet_run ../models/aarch64
     cd ..
     rm -rf build_aarch64
-    cp data/5.png models/aarch64
+    cp data/cat.png models/aarch64
     cd models
     mkdir aarch64_run
     cp -r data/ aarch64_run/
@@ -93,10 +93,10 @@ opencl_func(){
           -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH ..
 
     make -j$(nproc)
-    cp mnist_test ../models/opencl
+    cp mobilenet_run ../models/opencl
     cd ..
     rm -rf build_opencl
-    cp data/5.png models/opencl
+    cp data/cat.png models/opencl
     cd models
     mkdir opencl_run
     cp -r data/ opencl_run/

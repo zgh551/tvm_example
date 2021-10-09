@@ -53,6 +53,7 @@ else ()
     message(FATAL_ERROR "Invalid Machine name: " ${MACHINE_NAME})
 endif()
 
-add_executable(mnist_test main.cc)
+add_executable(mobilenet_run mobilenet.cc)
+#add_executable(${MACHINE_NAME}_run main.cc)
 
-target_link_libraries(mnist_test tvm_runtime ${OpenCV_LIBS} pthread dl)
+target_link_libraries(mobilenet_run tvm_runtime ${OpenCV_LIBS} pthread dl)
